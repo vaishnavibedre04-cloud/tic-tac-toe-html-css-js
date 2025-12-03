@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Tic Tac Toe</title>
+    <style>
+        :root{
+            --bg: oklab(74.277% -0.04528 0.13514 / 0.752);
+            --panel: #8ca322;
+            --accent: #667eea;
+            --x-color: #e74c3c;
+            --o-color: #27ae60;
+        }
+        html,body{height:100%;}
+        body{
+            margin:0;
+            font-family:system-ui,Segoe UI,Roboto,Arial;
+            background:linear-gradient(135deg,var(--bg),#e9f0ff);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:20px;
+        }
+        .panel{
+            background:var(--panel);
+            width:100%;
+            max-width:720px;
+            border-radius:12px;
+            box-shadow:0 12px 30px rgba(20,30,80,0.12);
+            padding:22px;
+        }
+        .header{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:12px;
+            margin-bottom:14px;
+        }
+        h1{font-size:20px;margin:0;color:#223}
+        .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+        .controls select,.controls button,.controls input[type="color"]{
+            padding:8px 10px;border-radius:6px;border:1px solid #ddd;background:white;cursor:pointer
+        }
+        .controls label{font-size:13px;color:#444;margin-right:6px}
+        .board-wrap{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+        .game-area{flex:1;min-width:260px}
+        .status{margin-bottom:12px;font-weight:600;color:#333}
+        .board{
+            display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+            width:100%;max-width:360px;background:var(--accent);padding:8px;border-radius:8px
+        }
+        .cell{
+            background:var(--panel);height:110px;display:flex;align-items:center;justify-content:center;
+            font-size:48px;font-weight:700;border-radius:6px;cursor:pointer;user-select:none;transition:transform .12s ease,background .12s ease
+        }
+        .cell:active{transform:scale(.98)}
+        .cell.x{color:var(--x-color)}
+        .cell.o{color:var(--o-color)}
+        .options{min-width:200px}
+        .small{font-size:13px;color:#555;margin-bottom:8px}
+        .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+        .btn{padding:10px 14px;border-radius:8px;border:none;background:var(--accent);color:white;cursor:pointer;font-weight:700}
+        .btn.secondary{background:#e74c3c}
+        @media(max-width:640px){.cell{height:80px;font-size:36px}}
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <div class="header">
+            <h1>Tic Tac Toe — Modes & Options</h1>
+            <div class="controls">
+                <label for="playMode">Mode:</label>
+                <select id="playMode">
+                    <option value="ai">Play vs AI</option>
+                    <option value="friend">Play with Friend</option>
+                </select>
+
+                <label for="difficulty">AI Style:</label>
+                <select id="difficulty">
+                    <option value="hard">Genius (Hard)</option>
+                    <option value="medium">Medium</option>
+                    <option value="easy">Dumb (Easy)</option>
+                </select>
+
+                <label style="margin-left:8px">Background</label>
+                <input type="color" id="bgColor" value="#e9f0ff">
+
+                <label style="margin-left:8px">X color</label>
+                <input type="color" id="xColor" value="#e74c3c">
+                <label>O color</label>
+                <input type="color" id="oColor" value="#27ae60">
+
+                <label style="margin-left:8px">AI First</label>
+                <input type="checkbox" id="aiFirst" checked>
+
+                <label id="whoStartsLabel" style="display:none; margin-left:8px">Start:</label>
+                <select id="whoStarts" style="display:none">
+                    <option value="X">X</option>
+                    <option value="O">O</option>
+                </select>
+
+                <button class="btn" id="startBtn">Start Game</button>
+            </div>
+        </div>
+
+        <div class="board-wrap">
+            <div class="game-area">
+                <div id="status" class="status">Choose difficulty and press Start</div>
+                <div id="board" class="board">
+                    <div class="cell" data-index="0"></div>
+                    <div class="cell" data-index="1"></div>
+                    <div class="cell" data-index="2"></div>
+                    <div class="cell" data-index="3"></div>
+                    <div class="cell" data-index="4"></div>
+                    <div class="cell" data-index="5"></div>
+                    <div class="cell" data-index="6"></div>
+                    <div class="cell" data-index="7"></div>
+                    <div class="cell" data-index="8"></div>
+                </div>
+                <div style="margin-top:12px">
+                    <button class="btn" id="newBtn">New Game</button>
+                    <button class="btn secondary" id="resetBtn">Reset</button>
+                </div>
+            </div>
+            <div class="options">
+                <div class="small">How it plays:</div>
+                <div class="small">Hard — optimal (Minimax). Medium — mix of smart and random. Easy — random moves.</div>
+                <div style="height:14px"></div>
+                <div class="small">Tip: AI-first is enabled by default. Turn off to play first.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state and elements
+        let boardState = Array(9).fill('');
+        let gameOver = false;
+        const player = 'O';
+        const ai = 'X';
+        let aiDifficulty = 'hard';
+        let aiFirst = true;
+        let playMode = 'ai'; // 'ai' or 'friend'
+        let friendStarter = 'X';
+
+        const cells = Array.from(document.querySelectorAll('.cell'));
+        const statusEl = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const newBtn = document.getElementById('newBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const diffEl = document.getElementById('difficulty');
+        const aiFirstEl = document.getElementById('aiFirst');
+        const playModeEl = document.getElementById('playMode');
+        const whoStartsEl = document.getElementById('whoStarts');
+        const whoStartsLabel = document.getElementById('whoStartsLabel');
+        const xColorEl = document.getElementById('xColor');
+        const oColorEl = document.getElementById('oColor');
+        const bgColorEl = document.getElementById('bgColor');
+
+        // Apply colors and background
+        function applyColors(){
+            document.documentElement.style.setProperty('--x-color', xColorEl.value);
+            document.documentElement.style.setProperty('--o-color', oColorEl.value);
+            // apply a simple background color
+            document.body.style.background = bgColorEl.value;
+        }
+        xColorEl.addEventListener('input', applyColors);
+        oColorEl.addEventListener('input', applyColors);
+        bgColorEl.addEventListener('input', applyColors);
+        applyColors();
+
+        // Mode handling: show/hide whoStarts when friend mode selected
+        playModeEl.addEventListener('change', ()=>{
+            playMode = playModeEl.value;
+            if(playMode === 'friend'){
+                whoStartsEl.style.display = '';
+                whoStartsLabel.style.display = '';
+                aiFirstEl.disabled = true;
+                diffEl.disabled = true;
+            } else {
+                whoStartsEl.style.display = 'none';
+                whoStartsLabel.style.display = 'none';
+                aiFirstEl.disabled = false;
+                diffEl.disabled = false;
+            }
+        });
+
+        function startGame(){
+            playMode = playModeEl.value;
+            aiDifficulty = diffEl.value;
+            aiFirst = aiFirstEl.checked;
+            friendStarter = whoStartsEl.value || 'X';
+            resetBoard();
+            gameOver = false;
+            if(playMode === 'ai'){
+                statusEl.textContent = aiFirst ? 'Computer is thinking...' : 'Your Turn (O)';
+                if(aiFirst) setTimeout(()=>computerPlay(), 300);
+            } else {
+                // friend mode: set current turn
+                currentFriendTurn = friendStarter;
+                statusEl.textContent = `Player ${currentFriendTurn}'s Turn`;
+            }
+        }
+
+        // Friend mode current turn tracker
+        let currentFriendTurn = 'X';
+
+        function resetBoard(){
+            boardState = Array(9).fill('');
+            cells.forEach(c=>{c.className='cell'; c.textContent='';});
+            statusEl.textContent = 'Ready';
+            gameOver=false;
+        }
+
+        function newGame(){
+            startGame();
+        }
+
+        // Click handling for both modes
+        cells.forEach(cell => cell.addEventListener('click', () => {
+            if(gameOver) return;
+            const idx = Number(cell.dataset.index);
+            if(boardState[idx] !== '') return;
+
+            if(playMode === 'friend'){
+                // Local two-player
+                makeMove(idx, currentFriendTurn);
+                if(!gameOver){
+                    // toggle
+                    currentFriendTurn = currentFriendTurn === 'X' ? 'O' : 'X';
+                    statusEl.textContent = `Player ${currentFriendTurn}'s Turn`;
+                }
+            } else {
+                // vs AI mode: player is 'O'
+                const xCount = boardState.filter(v=>v==='X').length;
+                const oCount = boardState.filter(v=>v==='O').length;
+                let next;
+                if(aiFirst) next = (xCount === oCount) ? 'X' : 'O';
+                else next = (oCount === xCount) ? 'O' : 'X';
+                // allow player (O) only when next is O
+                if(next !== player) return;
+                makeMove(idx, player);
+                if(!gameOver) setTimeout(()=>computerPlay(), 350);
+            }
+        }));
+
+        function makeMove(index, sign){
+            if(gameOver) return;
+            if(boardState[index] !== '') return;
+            boardState[index]=sign;
+            updateBoard();
+            const term = getTerminalState(boardState);
+            if(term !== null){
+                gameOver=true;
+                if(term==='draw') statusEl.textContent = "It's a Draw!";
+                else {
+                    if(playMode==='friend') statusEl.textContent = `Player ${term} Won!`;
+                    else statusEl.textContent = term === player ? '🎉 You Won!' : '💻 Computer Won!';
+                }
+            } else {
+                if(playMode === 'friend'){
+                    // status update handled in click toggling
+                } else {
+                    statusEl.textContent = (sign===player) ? 'Computer is thinking...' : 'Your Turn (O)';
+                }
+            }
+        }
+
+        function updateBoard(){
+            cells.forEach((c,i)=>{
+                c.textContent = boardState[i];
+                c.classList.remove('x','o');
+                if(boardState[i]==='X') c.classList.add('x');
+                if(boardState[i]==='O') c.classList.add('o');
+            });
+        }
+
+        function computerPlay(){
+            if(gameOver) return;
+            const free = boardState.map((v,i)=> v===''?i:null).filter(v=>v!==null);
+            if(free.length===0) return;
+            let moveIndex;
+            if(aiDifficulty==='easy') moveIndex = randomMove(free);
+            else if(aiDifficulty==='medium') moveIndex = messyMove(free);
+            else moveIndex = bestMove();
+            makeMove(moveIndex, ai);
+        }
+
+        function randomMove(free){
+            return free[Math.floor(Math.random()*free.length)];
+        }
+
+        function messyMove(free){
+            if(Math.random() < 0.5) return bestMove();
+            return randomMove(free);
+        }
+
+        function bestMove(){
+            let bestScore = -Infinity;
+            let move = null;
+            for(let i=0;i<9;i++){
+                if(boardState[i]===''){
+                    boardState[i]=ai;
+                    const score = minimax(boardState,0,false);
+                    boardState[i]='';
+                    if(score>bestScore){bestScore=score;move=i}
+                }
+            }
+            return move!==null?move:randomMove(boardState.map((v,i)=>v===''?i:null).filter(v=>v!==null));
+        }
+
+        function minimax(state, depth, isMaximizing){
+            const term = getTerminalState(state);
+            if(term !== null){
+                if(term===ai) return 10-depth;
+                if(term===player) return depth-10;
+                return 0;
+            }
+            if(isMaximizing){
+                let best = -Infinity;
+                for(let i=0;i<9;i++){
+                    if(state[i]===''){state[i]=ai;const val=minimax(state,depth+1,false);state[i]='';best=Math.max(best,val)}
+                }
+                return best;
+            } else {
+                let best = Infinity;
+                for(let i=0;i<9;i++){
+                    if(state[i]===''){state[i]=player;const val=minimax(state,depth+1,true);state[i]='';best=Math.min(best,val)}
+                }
+                return best;
+            }
+        }
+
+        function getTerminalState(state){
+            const wins = [ [0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6] ];
+            for(const w of wins){
+                const a=state[w[0]],b=state[w[1]],c=state[w[2]];
+                if(a && a===b && a===c) return a;
+            }
+            if(state.every(s=>s!=='')) return 'draw';
+            return null;
+        }
+
+        // Bind buttons
+        startBtn.addEventListener('click', ()=>{ startGame(); applyColors(); });
+        newBtn.addEventListener('click', ()=>{ newGame(); applyColors(); });
+        resetBtn.addEventListener('click', ()=>{ resetBoard(); applyColors(); });
+
+        // Initialize UI state
+        playModeEl.dispatchEvent(new Event('change'));
+        resetBoard();
+
+    </script>
+</body>
+</html>
